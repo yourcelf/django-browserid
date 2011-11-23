@@ -21,23 +21,46 @@ DEFAULT_VERIFICATION_URL = 'https://browserid.org/verify'
 OKAY_RESPONSE = 'okay'
 
 
+def get_audience():
+    """Uses Django settings to format the audience.
+
+    To use this function, make sure there is either a SITE_URL in
+    your settings.py file or PROTOCOL and DOMAIN.
+
+    Examples using SITE_URL:
+        SITE_URL = 'http://127.0.0.1:8001'
+        SITE_URL = 'https://example.com'
+        SITE_URL = 'http://example.com'
+
+    If you don't have a SITE_URL you can also use these varables:
+    PROTOCOL, DOMAIN, and (optionally) PORT.
+    Example 1:
+        PROTOCOL = 'https://'
+        DOMAIN = 'example.com'
+
+    Example 2:
+        PROTOCOL = 'http://'
+        DOMAIN = '127.0.0.1'
+        PORT = '8001'
+    """
+    site_url = getattr(settings, 'SITE_URL', False)
+
+    # If we don't define it explicitly
+    if not site_url:
+        protocol = settings.PROTOCOL
+        hostname = settings.DOMAIN
+        port = settings.PORT
+        if (protocol, port) in (('https://', 443), ('http://', 80)):
+            site_url = ''.join(map(str, (protocol, hostname)))
+        else:
+            site_url = ''.join(map(str, (protocol, hostname, ':', port)))
+
+    return site_url
+
+
 class BrowserIDBackend(object):
     supports_anonymous_user = False
     supports_object_permissions = False
-
-    def get_audience(self, host, https):
-        if https:
-            scheme = 'https'
-            default_port = 443
-        else:
-            scheme = 'http'
-            default_port = 80
-
-        audience = "%s://%s" % (scheme, host)
-        if ':' in host:
-            return audience
-        else:
-            return "%s:%s" % (audience, default_port)
 
     def _verify_http_request(self, url, qs):
         params = {'timeout': getattr(settings, 'BROWSERID_HTTP_TIMEOUT',
@@ -86,8 +109,19 @@ class BrowserIDBackend(object):
         """Return object for a newly created user account."""
         return User.objects.create_user(username, email)
 
-    def authenticate(self, assertion=None, host=None, https=None):
-        result = self.verify(assertion, self.get_audience(host, https))
+    def authenticate(self, assertion=None, audience=None):
+        """``django.contrib.auth`` compatible authentication method.
+
+        Given a BrowserID assertion and an audience, it attempts to
+        verify them and then extract the email address for the authenticated
+        user.
+
+        An audience should be in the form ``https://example.com`` or
+        ``http://localhost:8001``.
+
+        See django_browserid.auth.get_audience()
+        """
+        result = self.verify(assertion, audience)
         if result is None:
             return None
         email = result['email']
