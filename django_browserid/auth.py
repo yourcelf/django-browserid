@@ -1,4 +1,3 @@
-
 try:
     import json
 except ImportError:
@@ -21,7 +20,7 @@ DEFAULT_VERIFICATION_URL = 'https://browserid.org/verify'
 OKAY_RESPONSE = 'okay'
 
 
-def get_audience():
+def get_audience(request):
     """Uses Django settings to format the audience.
 
     To use this function, make sure there is either a SITE_URL in
@@ -42,18 +41,33 @@ def get_audience():
         PROTOCOL = 'http://'
         DOMAIN = '127.0.0.1'
         PORT = '8001'
+
+    If none are set, we trust the request to populate the audience.
+    This is *not secure*!
     """
     site_url = getattr(settings, 'SITE_URL', False)
 
     # If we don't define it explicitly
     if not site_url:
-        protocol = settings.PROTOCOL
-        hostname = settings.DOMAIN
-        port = settings.PORT
-        if (protocol, port) in (('https://', 443), ('http://', 80)):
-            site_url = ''.join(map(str, (protocol, hostname)))
+        if request.is_secure():
+            req_proto = 'https://'
         else:
-            site_url = ''.join(map(str, (protocol, hostname, ':', port)))
+            req_proto = 'http://'
+        protocol = getattr(settings, 'PROTOCOL', req_proto)
+        req_domain = request.get_host()
+        if not getattr(settings, 'DOMAIN'):
+            log.warning('django-browserid WARNING you are missing '
+                        'settings.SITE_URL. This is not a secure way '
+                        'to verify assertions. Please fix me. '
+                        'Setting domain to %s.' % req_domain)
+
+        domain = getattr(settings, 'DOMAIN', req_domain)
+        standards = {'https://': 443, 'http://': 80}
+        port = getattr(settings, 'PORT', standards[protocol])
+        if port == standards[protocol]:
+            site_url = ''.join(map(str, (protocol, domain)))
+        else:
+            site_url = ''.join(map(str, (protocol, domain, ':', port)))
 
     return site_url
 
