@@ -36,6 +36,7 @@ class Verify(BaseFormView):
         """Handle a failed login. Use this to perform complex redirects
         post-login.
         """
+        self.request.session['CLEAR_BROWSERID'] = True
         return redirect(self.get_failure_url())
 
     def form_valid(self, form):

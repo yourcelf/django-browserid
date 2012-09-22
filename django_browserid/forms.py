@@ -8,6 +8,12 @@ from django import forms
 
 class BrowserIDForm(forms.Form):
     assertion = forms.CharField(widget=forms.HiddenInput())
+    clear_browserid = forms.CharField(widget=forms.HiddenInput())
+
+    def __init__(self, clear_browserid=False, *args, **kwargs):
+        super(BrowserIDForm, self).__init__(*args, **kwargs)
+        if not clear_browserid:
+            self.fields.pop('clear_browserid')
 
     class Media:
         js = ('browserid/browserid.js', 'https://login.persona.org/include.js')

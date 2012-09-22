@@ -40,7 +40,11 @@
 
         navigator.id.watch({
             onlogin: function(assertion) {
-                if (assertion) {
+                var $clear = $("#id_clear_browserid")
+                if ($clear.length > 0) {
+                    navigator.id.logout();
+                    $clear.remove();
+                } else if (assertion) {
                     var $e = $('#id_assertion');
                     $e.val(assertion.toString());
                     $e.parent().submit();
